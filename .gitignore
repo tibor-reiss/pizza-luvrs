@@ -2,3 +2,9 @@ node_modules
 .vscode
 log
 .DS_Store
+cloudformation/env_variables
+templates/index.hbs
+templates/layout.hbs
+templates/pizza.make.hbs
+templates/partials/header.hbs
+assets/js/make.js

@@ -1,9 +1,9 @@
 const Sequelize = require('sequelize')
 
-const database = 'pizza_luvrs'
-const host = '<enter_host_here>'
-const username = 'postgres'
-const password = 'password'
+const database = process.env.PIZZA_DB
+const host = process.env.PIZZA_HOST
+const username = process.env.PIZZA_USER
+const password = process.env.PIZZA_PASS
 
 const pgClient = new Sequelize(
   database,
@@ -38,7 +38,9 @@ const Pizza = pgClient.define('pizza', {
 })
 
 Pizza.initialize = async () => {
-  return Pizza.sync({ force: true }).then(() => {
+  console.log('*****data.pizzaStore.initialize')
+  //return Pizza.sync({ force: true }).then(() => {
+  return Pizza.sync().then(() => {
     console.log('postgres connection ready')
   }).catch(err => console.error(err))
 }

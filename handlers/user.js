@@ -4,6 +4,7 @@ const userStore = require('../data/users')
 const pizzaStore = require('../data/pizzas')
 
 async function postUser (req, h) {
+  console.log('*****handlers.users.postUser')
   const user = await userStore.create(req.payload.username.toLowerCase(), req.payload.password)
   const sid = String(Math.random())
   await req.server.app.cache.set(sid, user, 0)
@@ -12,6 +13,7 @@ async function postUser (req, h) {
 }
 
 async function getUser (req, h) {
+  console.log('*****handlers.users.getUser')
   const username = get(req, 'params.username') || get(req, 'auth.credentials.user.username')
   const pizzas = await pizzaStore.getForUser(username)
   const context = {
@@ -24,6 +26,7 @@ async function getUser (req, h) {
 }
 
 module.exports = (req, h) => {
+  console.log('*****handlers.users')
   if (req.method === 'get') {
     return getUser(req, h)
   }

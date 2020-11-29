@@ -4,6 +4,7 @@ const users = require('../data/users')
 const querystring = require('querystring')
 
 module.exports = async (req, h) => {
+  console.log('*****handlers.login')
   if (req.auth.isAuthenticated) {
     return h.redirect('/')
   }

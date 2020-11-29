@@ -1,0 +1,8 @@
+#!/bin/bash
+s3="//$S3_BUCKET.s3.$S3_REGION.amazonaws.com/"
+sed 's,{TO_REPLACE},'"$s3"',' ../templates/pizza.make.hbs_template > ../templates/pizza.make.hbs
+sed 's,{TO_REPLACE},'"$s3"',' ../templates/index.hbs_template > ../templates/index.hbs
+sed 's,{TO_REPLACE},'"$s3"',' ../templates/layout.hbs_template > ../templates/layout.hbs
+sed 's,{TO_REPLACE},'"$s3"',' ../templates/partials/header.hbs_template > ../templates/partials/header.hbs
+
+sed 's,{TO_REPLACE},'"$s3"',' ../assets/js/make.js_template > ../assets/js/make.js

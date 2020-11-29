@@ -3,12 +3,42 @@
   "Parameters": {
     "ImageId": {
       "Type": "AWS::EC2::Image::Id",
-      "Description": "Enter an EC2 AMI Id to use in the Launch Configuration"
+      "Description": "Your AMI image name"
     },
     "KeyPair": {
       "Type": "String",
-      "Default": "pizza-keys",
-      "Description": "Enter the name of a keypair to be used with the EC2 instances"
+      "Default": "pizza111-keys",
+      "Description": "Your EC2 key"
+    },
+    "PizzaDbName": {
+      "Type": "String",
+      "Default": "pizza_luvers",
+      "Description": "Your dbname for the RDS"
+    },
+    "PizzaUserName": {
+      "Type": "String",
+      "Default": "pizzadb123",
+      "Description": "Your username for the RDS"
+    },
+    "PizzaPassword": {
+      "Type": "String",
+      "Default": "pizzadb123",
+      "Description": "Your password for the RDS"
+    },
+    "DynTableTopping": {
+      "Type" : "String",
+      "Default": "toppings123",
+      "Description": "Your dynamdb table name for toppings"
+    },
+    "DynTableUsers": {
+      "Type" : "String",
+      "Default": "users123",
+      "Description": "Your dynamdb table name for toppings"
+    },
+    "S3BucketName": {
+      "Type": "String",
+      "Default": "pizzas3bucket123",
+      "Description": "Your s3 bucket name"
     }
   },
   "Resources": {
@@ -166,15 +196,15 @@
           { "Fn::GetAtt" : [ "PizzaSubnetB", "AvailabilityZone" ] }
         ],
         "Cooldown": "300",
-        "DesiredCapacity": "2",
-        "HealthCheckGracePeriod": "300",
+        "DesiredCapacity": "1",
+        "HealthCheckGracePeriod": "600",
         "HealthCheckType": "ELB",
         "LaunchTemplate": {
           "LaunchTemplateId": { "Ref": "PizzaLaunchTemplate" },
           "Version": { "Fn::GetAtt" : [ "PizzaLaunchTemplate", "DefaultVersionNumber" ] }
         },
-        "MaxSize": "4",
-        "MinSize": "2",
+        "MaxSize": "2",
+        "MinSize": "1",
         "TargetGroupARNs": [
           { "Ref": "PizzaTargetGroup" }
         ],
@@ -235,6 +265,42 @@
         ]
       }
     },
+    "PizzaRDSDB": {
+      "Type": "AWS::RDS::DBInstance",
+      "DependsOn": "PizzaVPCGatewayAttachment",
+      "Properties": {
+        "AllocatedStorage": "5",
+        "AllowMajorVersionUpgrade": "false",
+        "AutoMinorVersionUpgrade": "true",
+        "DBInstanceClass": "db.t2.micro",
+        "Port": "5432",
+        "PubliclyAccessible": "true",
+        "StorageType": "gp2",
+        "BackupRetentionPeriod": "0",
+        "MasterUsername": { "Ref": "PizzaUserName" },
+        "MasterUserPassword": { "Ref": "PizzaPassword" },
+        "PreferredBackupWindow": "07:47-08:17",
+        "PreferredMaintenanceWindow": "mon:12:54-mon:13:24",
+        "DBName": { "Ref": "PizzaDbName" },
+        "Engine": "postgres",
+        "EngineVersion": "9.5.2",
+        "LicenseModel": "postgresql-license",
+        "DBSubnetGroupName": {
+          "Ref": "PizzaDBSubnetGroup"
+        },
+        "VPCSecurityGroups": [
+          {
+            "Ref": "PizzaRDSSecurityGroup"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "workload-type",
+            "Value": "other"
+          }
+        ]
+      }
+    },
     "PizzaLaunchTemplate": {
       "Type": "AWS::EC2::LaunchTemplate",
       "Properties" : {
@@ -256,45 +322,36 @@
             "SecurityGroupIds": [
               { "Fn::GetAtt": ["PizzaEC2SecurityGroup", "GroupId"] }
             ],
-            "UserData": "IyEvYmluL2Jhc2gNCmVjaG8gInN0YXJ0aW5nIHBpenphLWx1dnJzIg0KY2QgL2hvbWUvZWMyLXVzZXIvcGl6emEtbHV2cnMNCm5wbSBzdGFydA=="
+            "UserData": {
+                "Fn::Base64" : {
+                    "Fn::Join" : [
+                        "", [
+                            "#!/bin/bash\n",
+                            "echo 'Exporting environment variables...'\n",
+                            "echo \"export PIZZA_HOST=", {"Fn::GetAtt": ["PizzaRDSDB", "Endpoint.Address"]}, "\" >> /home/ec2-user/.bashrc\n",
+                            "echo \"export PIZZA_DB=", {"Ref": "PizzaDbName"}, "\" >> /home/ec2-user/.bashrc\n",
+                            "echo \"export PIZZA_USER=", {"Ref": "PizzaUserName"}, "\" >> /home/ec2-user/.bashrc\n",
+                            "echo \"export PIZZA_PASS=", {"Ref": "PizzaPassword"}, "\" >> /home/ec2-user/.bashrc\n",
+                            "echo \"export DYNDB_TOPPINGS=", {"Ref": "DynTableTopping"}, "\" >> /home/ec2-user/.bashrc\n",
+                            "echo \"export DYNDB_USERS=", {"Ref": "DynTableUsers"}, "\" >> /home/ec2-user/.bashrc\n",
+                            "echo \"export S3_BUCKET=", {"Ref": "S3BucketName"}, "\" >> /home/ec2-user/.bashrc\n",
+                            "echo \"export S3_REGION=", {"Ref": "AWS::Region"}, "\" >> /home/ec2-user/.bashrc\n",
+                            "source /home/ec2-user/.bashrc\n",
+                            "echo PIZZA_HOST=$PIZZA_HOST\n",
+                            "echo PIZZA_DB=$PIZZA_DB\n",
+                            "echo PIZZA_USER=$PIZZA_USER\n",
+                            "echo PIZZA_PASS=$PIZZA_PASS\n",
+                            "cd /home/ec2-user/pizza\n",
+                            "echo 'Creating db table with data'\n",
+                            "./cloudformation/create_pizza_table_bash\n",
+                            "echo 'starting piiiiza-luvers'\n",
+                            "npm start\n"
+                        ]
+                    ]
+                }
+            }
           }
         }
-    },
-    "PizzaRDSDB": {
-      "Type": "AWS::RDS::DBInstance",
-      "DependsOn": "PizzaVPCGatewayAttachment",
-      "Properties": {
-        "AllocatedStorage": "5",
-        "AllowMajorVersionUpgrade": "false",
-        "AutoMinorVersionUpgrade": "true",
-        "DBInstanceClass": "db.t2.micro",
-        "Port": "5432",
-        "PubliclyAccessible": "true",
-        "StorageType": "gp2",
-        "BackupRetentionPeriod": "7",
-        "MasterUsername": "awsuser",
-        "MasterUserPassword": "MyPassword",
-        "PreferredBackupWindow": "07:47-08:17",
-        "PreferredMaintenanceWindow": "mon:12:54-mon:13:24",
-        "DBName": "MyDatabase",
-        "Engine": "postgres",
-        "EngineVersion": "9.5.2",
-        "LicenseModel": "postgresql-license",
-        "DBSubnetGroupName": {
-          "Ref": "PizzaDBSubnetGroup"
-        },
-        "VPCSecurityGroups": [
-          {
-            "Ref": "PizzaRDSSecurityGroup"
-          }
-        ],
-        "Tags": [
-          {
-            "Key": "workload-type",
-            "Value": "other"
-          }
-        ]
-      }
     },
     "PizzaTableToppings": {
       "Type": "AWS::DynamoDB::Table",
@@ -314,7 +371,8 @@
         "ProvisionedThroughput": {
           "ReadCapacityUnits": "5",
           "WriteCapacityUnits": "5"
-        }
+        },
+        "TableName": { "Ref": "DynTableTopping" }
       }
     },
     "PizzaTableUsers": {
@@ -335,13 +393,15 @@
         "ProvisionedThroughput": {
           "ReadCapacityUnits": "5",
           "WriteCapacityUnits": "5"
-        }
+        },
+        "TableName": { "Ref": "DynTableUsers" }
       }
     },
     "PizzaS3Bucket": {
       "Type": "AWS::S3::Bucket",
       "Properties": {
         "AccessControl": "Private",
+        "BucketName": {"Ref": "S3BucketName"},
         "CorsConfiguration": {
           "CorsRules": [
             {

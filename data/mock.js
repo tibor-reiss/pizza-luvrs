@@ -1,6 +1,7 @@
 const pizzas = require('./pizzas')
 const users = require('./users')
 const toppings = require('./toppings')
+const {s3_bucket} = require('../lib/imageStoreS3')
 
 const mockPizzas = [
   require('./mock_pizzas/best_pizza.json'),
@@ -12,15 +13,17 @@ const mockPizzas = [
 ]
 
 module.exports.hydrate = async () => {
-  users.create('ryan', 'pass', () => {})
-  users.create('jim', 'pass', () => {})
-  users.create('kathy', 'pass', () => {})
-
-  await pizzas.init()
-  for (const pizza of mockPizzas) {
-    pizzas.batchImport(pizza.name, pizza.toppings, pizza.img, pizza.username)
-  }
+  console.log('*****data.mock.hydrate')
+  // prep users
+  await users.init()
 
   // prep toppings
-  toppings.init()
+  await toppings.init()
+
+  // prep pizzas
+  await pizzas.init()
+  for (const pizza of mockPizzas) {
+    img = s3_bucket + pizza.img
+    await pizzas.batchImport(pizza.name, pizza.toppings, img, pizza.username)
+  }
 }
