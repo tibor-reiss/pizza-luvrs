@@ -447,6 +447,44 @@
         }
       }
     },
+    "PizzaS3BucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "DependsOn": "PizzaS3Bucket",
+      "Properties": {
+        "Bucket": {
+          "Ref": "PizzaS3Bucket"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "s3:GetObject",
+              "Resource": {
+                "Fn::Join": ["", [
+                  "arn:aws:s3:::",
+                  { "Ref": "PizzaS3Bucket" },
+                  "/*"
+                ]]
+              }
+            },
+            {
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Join": ["", [
+                  "arn:aws:s3:::",
+                  { "Ref": "PizzaS3Bucket" },
+                  "/pizzas/*"
+                ]]
+              }
+            }
+          ]
+        }
+      }
+    },
     "PizzaEC2SecurityGroup": {
       "Type": "AWS::EC2::SecurityGroup",
       "Properties": {
@@ -474,7 +512,6 @@
             {
               "Effect": "Allow",
               "Action": [
-                "s3:DeleteObject",
                 "s3:GetObject",
                 "s3:PutObject"
               ],
@@ -483,18 +520,6 @@
                   "arn:aws:s3:::",
                   { "Ref": "PizzaS3Bucket" },
                   "/*"
-                ]]
-              }
-            },
-            {
-              "Effect": "Allow",
-              "Action": [
-                "s3:ListBucket"
-              ],
-              "Resource": {
-                "Fn::Join": ["", [
-                  "arn:aws:s3:::",
-                  { "Ref": "PizzaS3Bucket" }
                 ]]
               }
             }
@@ -511,7 +536,6 @@
             {
               "Effect": "Allow",
               "Action": [
-                "dynamodb:DeleteItem",
                 "dynamodb:GetItem",
                 "dynamodb:PutItem",
                 "dynamodb:Scan",
@@ -531,7 +555,6 @@
             {
               "Effect": "Allow",
               "Action": [
-                "dynamodb:DeleteItem",
                 "dynamodb:GetItem",
                 "dynamodb:PutItem",
                 "dynamodb:Scan",
