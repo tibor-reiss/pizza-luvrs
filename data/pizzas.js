@@ -63,7 +63,7 @@ function prepPizza(pizza) {
 }
 
 function debriefPizza(pizza) {
-  console.log('*****data.pizzas.debriefPizza', pizza)
+  console.log('*****data.pizzas.debriefPizza', pizza.id)
   if(pizza==null){
     return null
   } else {
@@ -75,7 +75,7 @@ function debriefPizza(pizza) {
 }
 
 function debriefPizzas(pizzas) {
-  console.log('*****data.pizzas.debriefPizzas', pizzas)
+  console.log('*****data.pizzas.debriefPizzas')
   return pizzas.map(debriefPizza)
 }
 

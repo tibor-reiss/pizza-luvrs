@@ -5,7 +5,7 @@ AWS.config.update({region: 'eu-central-1'})
 const dynamodb = new AWS.DynamoDB.DocumentClient()
 
 async function putItem(table, item) {
-    console.log('*****data.dynamoStore.putItem', table, item)
+    console.log('*****data.dynamoStore.putItem', table, item.id)
     return new Promise((resolve, reject) => {
         const params = {
             TableName: table,
@@ -14,8 +14,10 @@ async function putItem(table, item) {
 
         dynamodb.put(params, (err, data) => {
             if(err) {
+                console.log('?????data.dynamoStore.putItem error', err)
                 reject(err)
             } else {
+                console.log('?????data.dynamoStore.putItem sucess', data)
                 resolve(data)
             }
         })
@@ -48,6 +50,7 @@ async function getItem(table, idKey, id) {
             }
         }
         dynamodb.get(params, (err, data) => {
+            console.log('*******data.dynamoStore.getItem', params)
             if(err) {
                 reject(err)
             } else {

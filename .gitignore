@@ -7,4 +7,4 @@ templates/index.hbs
 templates/layout.hbs
 templates/pizza.make.hbs
 templates/partials/header.hbs
-assets/js/make.js
+cloudformation/ec2_start

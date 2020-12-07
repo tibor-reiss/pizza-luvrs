@@ -5,8 +5,6 @@ aws s3 cp assets/header.png s3://$S3_BUCKET/header.png
 aws s3 cp assets/logo_header.png s3://$S3_BUCKET/logo_header.png
 aws s3 cp assets/pizza_shot.png s3://$S3_BUCKET/pizza_shot.png
 
-#TODO - make.js
-
 aws s3 cp assets/pizzas s3://$S3_BUCKET/pizzas/ --recursive
 
 aws s3 cp assets/toppings s3://$S3_BUCKET/toppings/ --recursive

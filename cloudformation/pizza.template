@@ -3,11 +3,12 @@
   "Parameters": {
     "ImageId": {
       "Type": "AWS::EC2::Image::Id",
+      "Default": "ami-0ab07939964fcb3c3",
       "Description": "Your AMI image name"
     },
     "KeyPair": {
       "Type": "String",
-      "Default": "pizza111-keys",
+      "Default": "key_ec2_pizza",
       "Description": "Your EC2 key"
     },
     "PizzaDbName": {
@@ -197,13 +198,13 @@
         ],
         "Cooldown": "300",
         "DesiredCapacity": "1",
-        "HealthCheckGracePeriod": "600",
+        "HealthCheckGracePeriod": "6000",
         "HealthCheckType": "ELB",
         "LaunchTemplate": {
           "LaunchTemplateId": { "Ref": "PizzaLaunchTemplate" },
           "Version": { "Fn::GetAtt" : [ "PizzaLaunchTemplate", "DefaultVersionNumber" ] }
         },
-        "MaxSize": "2",
+        "MaxSize": "1",
         "MinSize": "1",
         "TargetGroupARNs": [
           { "Ref": "PizzaTargetGroup" }
@@ -259,9 +260,7 @@
       "Properties": {
         "Path": "/",
         "Roles": [
-          {
-            "Ref": "PizzaEC2Role"
-          }
+          { "Ref": "PizzaEndpointAccessRole" }
         ]
       }
     },
@@ -299,6 +298,25 @@
             "Value": "other"
           }
         ]
+      }
+    },
+    "PizzaDBSubnetGroup": {
+      "Type": "AWS::RDS::DBSubnetGroup",
+      "Properties": {
+        "DBSubnetGroupDescription": "default",
+        "SubnetIds": [
+          { "Ref": "PizzaSubnetA" },
+          { "Ref": "PizzaSubnetB" }
+        ]
+      }
+    },
+    "PizzaRDSSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Security group for the pizza luvrs RDS database",
+        "VpcId": {
+          "Ref": "PizzaVPC"
+        }
       }
     },
     "PizzaLaunchTemplate": {
@@ -344,6 +362,8 @@
                             "cd /home/ec2-user/pizza\n",
                             "echo 'Creating db table with data'\n",
                             "./cloudformation/create_pizza_table_bash\n",
+                            "echo 'Uploading to s3...'\n",
+                            "./cloudformation/upload_to_s3\n",
                             "echo 'starting piiiiza-luvers'\n",
                             "npm start\n"
                         ]
@@ -423,22 +443,6 @@
         }
       }
     },
-    "PizzaDBSubnetGroup": {
-      "Type": "AWS::RDS::DBSubnetGroup",
-      "Properties": {
-        "DBSubnetGroupDescription": "default",
-        "SubnetIds": [
-          { "Ref": "PizzaSubnetA" },
-          { "Ref": "PizzaSubnetB" }
-        ]
-      }
-    },
-    "PizzaSNSTopic": {
-      "Type": "AWS::SNS::Topic",
-      "Properties": {
-        "DisplayName": "dynamodb"
-      }
-    },
     "PizzaEC2SecurityGroup": {
       "Type": "AWS::EC2::SecurityGroup",
       "Properties": {
@@ -457,87 +461,179 @@
         }
       }
     },
-    "PizzaRDSSecurityGroup": {
-      "Type": "AWS::EC2::SecurityGroup",
+    "PizzaS3AccessPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
       "Properties": {
-        "GroupDescription": "Security group for the pizza luvrs RDS database",
-        "VpcId": {
-          "Ref": "PizzaVPC"
-        }
-      }
-    },
-    "PizzaSNSTopicPolicy": {
-      "Type": "AWS::SNS::TopicPolicy",
-      "Properties": {
-        "Topics": [
-          {
-            "Ref": "PizzaSNSTopic"
-          }
-        ],
-        "PolicyDocument": {
-          "Version": "2008-10-17",
-          "Id": "__default_policy_ID",
-          "Statement": [
-            {
-              "Sid": "__default_statement_ID",
-              "Effect": "Allow",
-              "Principal": {
-                "AWS": "*"
-              },
-              "Action": [
-                "SNS:GetTopicAttributes",
-                "SNS:SetTopicAttributes",
-                "SNS:AddPermission",
-                "SNS:RemovePermission",
-                "SNS:DeleteTopic",
-                "SNS:Subscribe",
-                "SNS:ListSubscriptionsByTopic",
-                "SNS:Publish",
-                "SNS:Receive"
-              ],
-              "Resource": {
-                "Ref": "PizzaSNSTopic"
-              },
-              "Condition": {
-                "StringEquals": {
-                  "AWS:SourceOwner": { "Ref": "AWS::AccountId" }
-                }
-              }
-            }
-          ]
-        }
-      }
-    },
-    "PizzaS3BucketPolicy": {
-      "Type": "AWS::S3::BucketPolicy",
-      "Properties": {
-        "Bucket": {
-          "Ref": "PizzaS3Bucket"
-        },
         "PolicyDocument": {
           "Version": "2012-10-17",
-          "Id": "Policy1468466027141",
           "Statement": [
             {
-              "Sid": "Stmt1468466021537",
               "Effect": "Allow",
-              "Principal": "*",
-              "Action": "s3:GetObject",
+              "Action": [
+                "s3:DeleteObject",
+                "s3:GetObject",
+                "s3:PutObject"
+              ],
               "Resource": {
-                "Fn::Join": [
-                  "",
-                  [
-                    "arn:aws:s3:::",
-                    {
-                      "Ref": "PizzaS3Bucket"
-                    },
-                    "/*"
-                  ]
-                ]
+                "Fn::Join": ["", [
+                  "arn:aws:s3:::",
+                  { "Ref": "PizzaS3Bucket" },
+                  "/*"
+                ]]
+              }
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "s3:ListBucket"
+              ],
+              "Resource": {
+                "Fn::Join": ["", [
+                  "arn:aws:s3:::",
+                  { "Ref": "PizzaS3Bucket" }
+                ]]
               }
             }
           ]
         }
+      }
+    },
+    "PizzaDynamoDBAccessPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "dynamodb:DeleteItem",
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:Scan",
+                "dynamodb:UpdateItem"
+              ],
+              "Resource": {
+                "Fn::Join": ["", [
+                  "arn:aws:dynamodb:",
+                  { "Ref": "AWS::Region"},
+                  ":",
+                  { "Ref": "AWS::AccountId" },
+                  ":table/",
+                  { "Ref": "DynTableTopping" }
+                ]]
+              },
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "dynamodb:DeleteItem",
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:Scan",
+                "dynamodb:UpdateItem"
+              ],
+              "Resource": {
+                "Fn::Join": ["", [
+                  "arn:aws:dynamodb:",
+                  { "Ref": "AWS::Region"},
+                  ":",
+                  { "Ref": "AWS::AccountId" },
+                  ":table/",
+                  { "Ref": "DynTableUsers" }
+                ]]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "PizzaEndpointAccessRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "ec2.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Path": "/",
+        "ManagedPolicyArns": [
+          { "Ref": "PizzaS3AccessPolicy" },
+          { "Ref": "PizzaDynamoDBAccessPolicy" }
+        ]
+      }
+    },
+    "PizzaS3VPCEndpoint": {
+      "Type": "AWS::EC2::VPCEndpoint",
+      "DependsOn": [
+        "PizzaVPC",
+        "PizzaRouteTable"
+      ],
+      "Properties": {
+        "PolicyDocument": { 
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": "*",
+              "Effect": "Allow",
+              "Principal": "*",
+              "Resource": "*"
+            }
+          ]
+        },
+        "RouteTableIds": [
+          { "Ref": "PizzaRouteTable" }
+        ],
+        "ServiceName": {
+          "Fn::Join": ["", [
+            "com.amazonaws.",
+            { "Ref": "AWS::Region" },
+            ".s3"
+          ]]
+        },
+        "VpcId": { "Ref": "PizzaVPC"}
+      }
+    },
+    "PizzaDynamoDBVPCEndpoint": {
+      "Type": "AWS::EC2::VPCEndpoint",
+      "DependsOn": [
+        "PizzaVPC",
+        "PizzaRouteTable"
+      ],
+      "Properties": {
+        "PolicyDocument": { 
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": "*",
+              "Effect": "Allow",
+              "Principal": "*",
+              "Resource": "*"
+            }
+          ]
+        },
+        "RouteTableIds": [
+          { "Ref": "PizzaRouteTable" }
+        ],
+        "ServiceName": {
+          "Fn::Join": ["", [
+            "com.amazonaws.",
+            { "Ref": "AWS::Region" },
+            ".dynamodb"
+          ]]
+        },
+        "VpcId": { "Ref": "PizzaVPC"}
       }
     },
     "PizzaScalingPolicy": {
@@ -553,94 +649,6 @@
           },
           "TargetValue": 5000000.0
         }
-      }
-    },
-    "PizzaCloudWatchToppingsReadAlarm": {
-      "Type": "AWS::CloudWatch::Alarm",
-      "Properties": {
-        "ActionsEnabled": "true",
-        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
-        "EvaluationPeriods": "5",
-        "MetricName": "ConsumedReadCapacityUnits",
-        "Namespace": "AWS/DynamoDB",
-        "Period": "60",
-        "Statistic": "Sum",
-        "Threshold": "240.0",
-        "AlarmActions": [
-          { "Ref": "PizzaSNSTopic" }
-        ],
-        "Dimensions": [
-          {
-            "Name": "TableName",
-            "Value": "toppings"
-          }
-        ]
-      }
-    },
-    "PizzaCloudWatchToppingsWriteAlarm": {
-      "Type": "AWS::CloudWatch::Alarm",
-      "Properties": {
-        "ActionsEnabled": "true",
-        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
-        "EvaluationPeriods": "5",
-        "MetricName": "ConsumedWriteCapacityUnits",
-        "Namespace": "AWS/DynamoDB",
-        "Period": "60",
-        "Statistic": "Sum",
-        "Threshold": "240.0",
-        "AlarmActions": [
-          { "Ref": "PizzaSNSTopic" }
-        ],
-        "Dimensions": [
-          {
-            "Name": "TableName",
-            "Value": "toppings"
-          }
-        ]
-      }
-    },
-    "PizzaCloudWatchUsersReadAlarm": {
-      "Type": "AWS::CloudWatch::Alarm",
-      "Properties": {
-        "ActionsEnabled": "true",
-        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
-        "EvaluationPeriods": "5",
-        "MetricName": "ConsumedReadCapacityUnits",
-        "Namespace": "AWS/DynamoDB",
-        "Period": "60",
-        "Statistic": "Sum",
-        "Threshold": "240.0",
-        "AlarmActions": [
-          { "Ref": "PizzaSNSTopic" }
-        ],
-        "Dimensions": [
-          {
-            "Name": "TableName",
-            "Value": "users"
-          }
-        ]
-      }
-    },
-    "PizzaCloudWatchUsersWriteAlarm": {
-      "Type": "AWS::CloudWatch::Alarm",
-      "Properties": {
-        "ActionsEnabled": "true",
-        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
-        "EvaluationPeriods": "5",
-        "MetricName": "ConsumedWriteCapacityUnits",
-        "Namespace": "AWS/DynamoDB",
-        "Period": "60",
-        "Statistic": "Sum",
-        "Threshold": "240.0",
-        "AlarmActions": [
-          { "Ref": "PizzaSNSTopic" }
-        ],
-        "Dimensions": [
-          {
-            "Name": "TableName",
-            "Value": "users"
-          }
-        ]
       }
     },
     "PizzaNetworkAclEntry": {
@@ -783,18 +791,6 @@
         "CidrIp": "0.0.0.0/0"
       }
     },
-    "PizzaRDSSGIngressRuleForPort5432": {
-      "Type": "AWS::EC2::SecurityGroupIngress",
-      "Properties": {
-        "GroupId": {
-          "Ref": "PizzaRDSSecurityGroup"
-        },
-        "IpProtocol": "tcp",
-        "FromPort": "5432",
-        "ToPort": "5432",
-        "CidrIp": "0.0.0.0/0"
-      }
-    },
     "PizzaEC2SGEgressRule": {
       "Type": "AWS::EC2::SecurityGroupEgress",
       "Properties": {
@@ -812,6 +808,18 @@
           "Ref": "PizzaELBSecurityGroup"
         },
         "IpProtocol": "-1",
+        "CidrIp": "0.0.0.0/0"
+      }
+    },
+    "PizzaRDSSGIngressRuleForPort5432": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "PizzaRDSSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "5432",
+        "ToPort": "5432",
         "CidrIp": "0.0.0.0/0"
       }
     },
