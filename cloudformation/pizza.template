@@ -3,7 +3,7 @@
   "Parameters": {
     "ImageId": {
       "Type": "AWS::EC2::Image::Id",
-      "Default": "ami-0ab07939964fcb3c3",
+      "Default": "ami-04ad568d5d8fe56de",
       "Description": "Your AMI image name"
     },
     "KeyPair": {
@@ -198,7 +198,7 @@
         ],
         "Cooldown": "300",
         "DesiredCapacity": "1",
-        "HealthCheckGracePeriod": "6000",
+        "HealthCheckGracePeriod": "600",
         "HealthCheckType": "ELB",
         "LaunchTemplate": {
           "LaunchTemplateId": { "Ref": "PizzaLaunchTemplate" },
@@ -360,9 +360,13 @@
                             "echo PIZZA_USER=$PIZZA_USER\n",
                             "echo PIZZA_PASS=$PIZZA_PASS\n",
                             "cd /home/ec2-user/pizza\n",
-                            "echo 'Creating db table with data'\n",
+                            "echo 'Creating db table with data...'\n",
                             "./cloudformation/create_pizza_table_bash\n",
+                            "echo 'Creating templates...'\n",
+                            "cd /home/ec2-user/pizza/cloudformation\n",
+                            "./replace_hbs\n",
                             "echo 'Uploading to s3...'\n",
+                            "cd /home/ec2-user/pizza\n",
                             "./cloudformation/upload_to_s3\n",
                             "echo 'starting piiiiza-luvers'\n",
                             "npm start\n"
